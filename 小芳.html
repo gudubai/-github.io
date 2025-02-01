@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>爱心追小芳</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #ffe6f2; }
+        #gameCanvas { width: 100%; height: 100vh; display: none; } /* 初始隐藏 */
+        #score { position: absolute; top: 10px; right: 10px; font-size: 24px; color: #ff1493; font-family: Arial, sans-serif; }
+        #startButton {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            padding: 15px 30px;
+            font-size: 24px;
+            color: white;
+            background: #ff1493;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div id="score">击败小芳：0次</div>
+    <canvas id="gameCanvas"></canvas>
+    <button id="startButton">开始游戏</button>
+
+<script>
+// 自动适配手机全屏
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+// 🎮 游戏参数
+let playerX = canvas.width/2;
+let hearts = [];
+let enemies = [];
+let score = 0; // 击败次数
+let gameStarted = false; // 游戏是否开始
+const config = {
+    heartSpeed: 8,        // 爱心速度
+    enemySpeed: 0.2,      // 敌人下落速度
+    spawnRate: 0.015,     // 敌人生成率
+    fireworkParticles: 30 // 烟花粒子数量
+};
+
+// 💖 替换成你的照片（两种方法任选其一）
+// 方法1：将手机照片转成Base64（推荐用这个网站转：https://base64.guru/converter/encode/image）
+const enemyImg = new Image();
+enemyImg.src = '杰.jpg'; // ✂️替换这里！
+
+// 方法2：把照片上传到网络相册，替换下方链接
+// enemyImg.src = '你的网络图片链接';
+
+// 加载爱心图片
+const heartImg = new Image();
+heartImg.src = '芳.jpg'; // 闪光爱心
+
+// 🎆 彩色烟花特效
+function createFirework(x, y) {
+    const particles = [];
+    for(let i=0; i<config.fireworkParticles; i++) {
+        particles.push({
+            x: x,
+            y: y,
+            color: `hsl(${Math.random()*360}, 100%, 50%)`, // 随机彩虹色
+            speed: Math.random()*3 + 1,
+            angle: Math.random()*Math.PI*2,
+            life: 1.5 // 粒子存活时间（秒）
+        });
+    }
+
+    function animate() {
+        particles.forEach((p, i) => {
+            if(p.life <= 0) return;
+            
+            // 粒子运动
+            p.x += Math.cos(p.angle) * p.speed;
+            p.y += Math.sin(p.angle) * p.speed;
+            p.life -= 0.02;
+
+            // 绘制粒子
+            ctx.globalAlpha = p.life;
+            ctx.fillStyle = p.color;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, 3*p.life, 0, Math.PI*2);
+            ctx.fill();
+        });
+
+        ctx.globalAlpha = 1; // 恢复透明度
+        requestAnimationFrame(animate);
+    }
+    animate();
+}
+
+// 🎮 游戏主循环
+let lastTime = 0;
+function gameLoop(timestamp) {
+    if (!gameStarted) return; // 如果游戏未开始，直接返回
+
+    const deltaTime = timestamp - lastTime;
+    lastTime = timestamp;
+    
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // 绘制发射器（粉色爱心）
+    ctx.drawImage(heartImg, playerX-25, canvas.height-80, 50, 50);
+    
+    // 生成敌人（你的照片）
+    if(Math.random() < config.spawnRate) {
+        enemies.push({
+            x: Math.random()*(canvas.width-80),
+            y: -80,
+            width: 60,
+            height: 60
+        });
+    }
+    
+    // 爱心运动
+    hearts.forEach((heart, i) => {
+        heart.y -= config.heartSpeed;
+        ctx.drawImage(heartImg, heart.x-15, heart.y-15, 30, 30);
+        
+        // 碰撞检测
+        enemies.forEach((enemy, j) => {
+            if(heart.x > enemy.x && heart.x < enemy.x+60 &&
+               heart.y > enemy.y && heart.y < enemy.y+60) {
+                createFirework(heart.x, heart.y); // 触发烟花
+                enemies.splice(j, 1);
+                hearts.splice(i, 1);
+                score++; // 击败次数+1
+                document.getElementById('score').innerText = `击败小芳：${score}次`; // 更新分数
+            }
+        });
+    });
+    
+    // 敌人运动
+    enemies.forEach((enemy) => {
+        enemy.y += config.enemySpeed * deltaTime;
+        ctx.drawImage(enemyImg, enemy.x, enemy.y, enemy.width, enemy.height);
+        
+        // 失败条件（浪漫提示）
+        if(enemy.y > canvas.height - 80) {
+            alert("❤️ 宝贝的爱心永远追着你~ ❤️");
+            enemies = [];
+        }
+    });
+    
+    requestAnimationFrame(gameLoop);
+}
+
+// 📱 触控操作（点击任意位置移动发射器）
+canvas.addEventListener('touchstart', (e) => {
+    if (!gameStarted) return; // 如果游戏未开始，不响应触控
+    e.preventDefault(); // 防止默认行为（修复卡顿）
+    playerX = e.touches[0].clientX;
+    hearts.push({ x: playerX, y: canvas.height-80 }); // 发射爱心
+});
+
+// 开始按钮点击事件
+document.getElementById('startButton').addEventListener('click', () => {
+    gameStarted = true; // 开始游戏
+    document.getElementById('startButton').style.display = 'none'; // 隐藏按钮
+    document.getElementById('gameCanvas').style.display = 'block'; // 显示画布
+    gameLoop(0); // 启动游戏循环
+});
+
+// 预加载资源
+window.onload = () => {
+    document.getElementById('startButton').style.display = 'block'; // 显示开始按钮
+};
+</script>
+</body>
+</html>
